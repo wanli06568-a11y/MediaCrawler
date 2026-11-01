@@ -27,3 +27,11 @@ class DataFetchError(RequestError):
 
 class IPBlockError(RequestError):
     """fetch so fast that the server block us ip"""
+
+
+class PlatformAccessError(RequestError):
+    """authentication, rate-limit, or account-security restriction"""
+
+
+class NoteNotFoundError(RequestError):
+    """Note does not exist or is abnormal"""

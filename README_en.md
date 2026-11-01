@@ -1,23 +1,30 @@
-<div align="center" markdown="1">
-   <sup>Special thanks to:</sup>
-   <br>
-   <br>
-   <a href="https://go.warp.dev/MediaCrawler">
-      <img alt="Warp sponsorship" width="400" src="https://github.com/warpdotdev/brand-assets/blob/main/Github/Sponsor/Warp-Github-LG-02.png?raw=true">
-   </a>
+# 🔥 MediaCrawler - Social Media Platform Crawler 🕷️
 
-### [Warp is built for coding with multiple AI agents](https://go.warp.dev/MediaCrawler)
+<div align="center">
 
+### 🤝 Special Thanks to Our Gold Sponsor
+
+<a href="https://www.browseract.ai/mediacrawler" target="_blank">
+  <img src="docs/static/images/browseract_ad.jpg" alt="BrowserAct" width="600">
+</a>
+
+<br>
+
+<a href="https://www.browseract.ai/mediacrawler" target="_blank">
+<small>BrowserAct lets you extract data from any website with a single sentence. No code required—build once, reuse reliably, and consume very few tokens. BrowserAct uses a real browser to automatically build data collection Bots, with built-in stealth browsing, CAPTCHA handling, and residential proxies, then outputs structured results directly. Try it free now.</small>
+</a>
 
 </div>
-<hr>
-# 🔥 MediaCrawler - Social Media Platform Crawler 🕷️
+
+---
 
 <div align="center">
 
 <a href="https://trendshift.io/repositories/8291" target="_blank">
   <img src="https://trendshift.io/api/badge/repositories/8291" alt="NanmiCoder%2FMediaCrawler | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
 </a>
+
+[![AtomGit](https://atomgit.com/NanmiCoder/MediaCrawler/star/new_badge.svg)](https://atomgit.com/NanmiCoder/MediaCrawler)
 
 [![GitHub Stars](https://img.shields.io/github/stars/NanmiCoder/MediaCrawler?style=social)](https://github.com/NanmiCoder/MediaCrawler/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/NanmiCoder/MediaCrawler?style=social)](https://github.com/NanmiCoder/MediaCrawler/network/members)
@@ -60,16 +67,14 @@ A powerful **multi-platform social media data collection tool** that supports cr
 | Zhihu   | ✅          | ✅              | ✅        | ✅              | ✅          | ✅        | ✅              |
 
 
-<details id="pro-version">
-<summary>🔗 <strong>🚀 MediaCrawlerPro Major Release! More features, better architectural design!</strong></summary>
-
-### 🚀 MediaCrawlerPro Major Release!
+<strong>MediaCrawlerPro Major Release! Open source is not easy, welcome to subscribe and support!</strong>
 
 > Focus on learning mature project architectural design, not just crawling technology. The code design philosophy of the Pro version is equally worth in-depth study!
 
 [MediaCrawlerPro](https://github.com/MediaCrawlerPro) core advantages over the open-source version:
 
 #### 🎯 Core Feature Upgrades
+- ✅ **Content Deconstruction Agent** (New feature)
 - ✅ **Resume crawling functionality** (Key feature)
 - ✅ **Multi-account + IP proxy pool support** (Key feature)
 - ✅ **Remove Playwright dependency**, easier to use
@@ -83,10 +88,9 @@ A powerful **multi-platform social media data collection tool** that supports cr
 #### 🎁 Additional Features
 - ✅ **Social media video downloader desktop app** (suitable for learning full-stack development)
 - ✅ **Multi-platform homepage feed recommendations** (HomeFeed)
-- [ ] **AI Agent based on social media platforms is under development 🚀🚀**
+- [ ] **AI Agent based on comment analysis is under development 🚀🚀**
 
 Click to view: [MediaCrawlerPro Project Homepage](https://github.com/MediaCrawlerPro) for more information
-</details>
 
 ## 🚀 Quick Start
 
@@ -148,6 +152,61 @@ uv run main.py --platform xhs --lt qrcode --type detail
 uv run main.py --help
 ```
 
+## WebUI Support
+
+<details>
+<summary>🖥️ <strong>WebUI Visual Operation Interface</strong></summary>
+
+MediaCrawler provides a web-based visual operation interface, allowing you to easily use crawler features without command line.
+
+#### Development (recommended)
+
+For development, you need to start both the backend API service and the frontend Vite dev server:
+
+```shell
+# Terminal 1: start API server (default port 8080)
+uv run uvicorn api.main:app --port 8080 --reload
+
+# Terminal 2: start frontend dev server
+cd webui
+npm install
+npm run dev        # starts on port 5173 by default and proxies /api to 8080
+```
+
+After successful startup, visit `http://localhost:5173/` to open the WebUI interface.
+
+> On first launch, an environment check is performed (calls `/api/env/check`), so make sure the backend service is running. If the check fails, you can click "Skip Check" to bypass it temporarily.
+
+#### Build for Production
+
+If you want the API server to serve the WebUI static assets directly, build the frontend first:
+
+```shell
+cd webui
+npm install
+npm run build      # outputs to api/webui/
+```
+
+Then start only the API server:
+
+```shell
+uv run uvicorn api.main:app --port 8080 --reload
+```
+
+After successful startup, visit `http://localhost:8080` to open the WebUI interface.
+
+#### WebUI Features
+
+- Visualize crawler parameter configuration (platform, login method, crawling type, etc.)
+- Real-time view of crawler running status and logs
+- Data preview and export
+
+#### Interface Preview
+
+<img src="docs/static/images/img_8.png" alt="WebUI Interface Preview">
+
+</details>
+
 <details>
 <summary>🔗 <strong>Using Python native venv environment management (Not recommended)</strong></summary>
 
@@ -206,7 +265,7 @@ python main.py --help
 
 ## 💾 Data Storage
 
-MediaCrawler supports multiple data storage methods, including CSV, JSON, Excel, SQLite, and MySQL databases.
+MediaCrawler supports multiple data storage methods, including CSV, JSON, JSONL, Excel, SQLite, and MySQL databases.
 
 📖 **For detailed usage instructions, please see: [Data Storage Guide](docs/data_storage_guide.md)**
 
@@ -214,45 +273,82 @@ MediaCrawler supports multiple data storage methods, including CSV, JSON, Excel,
 
 [🚀 MediaCrawlerPro Major Release 🚀! More features, better architectural design!](https://github.com/MediaCrawlerPro)
 
-## 🤝 Community & Support
-
 ### 💬 Discussion Groups
 - **WeChat Discussion Group**: [Click to join](https://nanmicoder.github.io/MediaCrawler/%E5%BE%AE%E4%BF%A1%E4%BA%A4%E6%B5%81%E7%BE%A4.html)
+- **Bilibili Account**: [Follow me](https://space.bilibili.com/434377496), sharing AI and crawler technology knowledge
 
-### 📚 Documentation & Tutorials
-- **Online Documentation**: [MediaCrawler Complete Documentation](https://nanmicoder.github.io/MediaCrawler/)
-- **Crawler Tutorial**: [CrawlerTutorial Free Tutorial](https://github.com/NanmiCoder/CrawlerTutorial)
-
-
-# Other common questions can be viewed in the online documentation
->
-> The online documentation includes usage methods, common questions, joining project discussion groups, etc.
-> [MediaCrawler Online Documentation](https://nanmicoder.github.io/MediaCrawler/)
->
-
-# Author's Knowledge Services
-> If you want to quickly get started and learn the usage of this project, source code architectural design, learn programming technology, or want to understand the source code design of MediaCrawlerPro, you can check out my paid knowledge column.
-
-[Author's Paid Knowledge Column Introduction](https://nanmicoder.github.io/MediaCrawler/%E7%9F%A5%E8%AF%86%E4%BB%98%E8%B4%B9%E4%BB%8B%E7%BB%8D.html)
-
-
----
-
-## ⭐ Star Trend Chart
-
-If this project helps you, please give a ⭐ Star to support and let more people see MediaCrawler!
-
-[![Star History Chart](https://api.star-history.com/svg?repos=NanmiCoder/MediaCrawler&type=Date)](https://star-history.com/#NanmiCoder/MediaCrawler&Date)
 
 ### 💰 Sponsor Display
 
-<a href="https://www.swiftproxy.net/?ref=nanmi">
-<img src="docs/static/images/img_5.png">
-<br>
-**Swiftproxy** - 90M+ global high-quality pure residential IPs, register to get free 500MB test traffic, dynamic traffic never expires!
-> Exclusive discount code: **GHB5** Get 10% off instantly!
-</a>
+<table>
+  <thead>
+    <tr>
+      <th width="220">Sponsor</th>
+      <th align="left">Introduction</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://tikhub.io/?utm_source=github.com/NanmiCoder/MediaCrawler&utm_medium=marketing_social&utm_campaign=retargeting&utm_content=carousel_ad"><img src="docs/static/images/tikhub_banner_zh.png" width="180" alt="TikHub"></a>
+      </td>
+      <td valign="middle">
+        <a href="https://tikhub.io/?utm_source=github.com/NanmiCoder/MediaCrawler&utm_medium=marketing_social&utm_campaign=retargeting&utm_content=carousel_ad">TikHub.io</a> provides 900+ highly stable data interfaces, covering 14+ mainstream domestic and international platforms including TK, DY, XHS, Y2B, Ins, X, etc. Supports multi-dimensional public data APIs for users, content, products, comments, etc., with 40M+ cleaned structured datasets. Use invitation code <code>cfzyejV9</code> to <a href="https://tikhub.io/?utm_source=github.com/NanmiCoder/MediaCrawler&utm_medium=marketing_social&utm_campaign=retargeting&utm_content=carousel_ad">register and recharge</a>, and get an additional $2 bonus.
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://go.nodemaven.com/MediaCrawleroctober"><img src="docs/static/images/nodemaven_banner_oct.png" width="180" alt="NodeMaven"></a>
+      </td>
+      <td valign="middle">
+        <a href="https://go.nodemaven.com/MediaCrawleroctober">NodeMaven</a> is an efficient proxy provider for web scraping and automation, offering the highest-quality IPs on the market. Key benefits include 99.9% uptime, ZIP targeting, IP filtering across all proxies (fraud score below 97%), no KYC, and unique free tools such as Proxy Bandwidth Checker, Meta Tag Checker, IP Lookup, and more. MediaCrawler users get 35% off mobile and residential proxies with code <code>CRAWLER35</code>, and 40% off ISP (static) proxies with code <code>CRAWLER40</code>. 👉 <a href="https://go.nodemaven.com/MediaCrawleroctober">Visit NodeMaven</a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://www.openlux.ai/register?channel=c_drxir46c"><img src="docs/static/images/openlux_logo.png" width="160" alt="OpenLux"></a>
+      </td>
+      <td valign="middle">
+        Thank you to <a href="https://www.openlux.ai/register?channel=c_drxir46c">OpenLux</a> for sponsoring this project! OpenLux is an all-in-one AI platform for businesses, bringing together leading AI models from major providers worldwide. With fast, reliable service and responsive technical support, OpenLux offers base pricing for Claude, OpenAI, and Gemini models as low as 8.82%, 4%, and 8% of official rates, respectively. Exclusive offer for MediaCrawler users: Sign up through our <a href="https://www.openlux.ai/register?channel=c_drxir46c">referral link</a> and enjoy up to 7.5% off credit top-ups! 👉 <a href="https://www.openlux.ai/register?channel=c_drxir46c">Get started with OpenLux</a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://sx.org/c/CRAWLER3G"><img src="docs/static/images/sx_logo.png" width="180" alt="SX.ORG"></a>
+      </td>
+      <td valign="middle">
+        <a href="https://sx.org/c/CRAWLER3G">SX.ORG</a> is a high-performance proxy network built for heavy web scraping and anti-bot bypass, fully compatible with MediaCrawler. Key advantages include global dynamic residential IP coverage across 190+ locations, 99.9% network uptime, precise country/city/ASN targeting, native HTTP(S) &amp; SOCKS5 support, and flexible session rotation for social media platforms. MediaCrawler users can use exclusive promo code <code>CRAWLER3G</code> at signup to get <strong>3 GB</strong> of free trial traffic. 👉 <a href="https://sx.org/c/CRAWLER3G">Claim 3 GB on SX.ORG</a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://proxylane.dev/?utm_source=mediacrawler&utm_medium=partnership&utm_campaign=mediacrawler_sponsor_202610&utm_content=github_readme_en"><img src="docs/static/images/proxylane_banner.png" width="180" alt="ProxyLane"></a>
+      </td>
+      <td valign="middle">
+        <a href="https://proxylane.dev/?utm_source=mediacrawler&utm_medium=partnership&utm_campaign=mediacrawler_sponsor_202610&utm_content=github_readme_en">ProxyLane</a> provides residential IPs inside mainland China (China Telecom, Unicom, Mobile) for running MediaCrawler from servers outside China, with the exit pinned to Shanghai, Beijing, Guangzhou, Shenzhen or another city. Add <code>_c_CN_city_Shanghai</code> to your proxy username in static mode to get a Shanghai residential IP; see the <a href="docs/proxylane/README_en.md">3-step setup guide</a>. MediaCrawler users can sign up with code <code>MEDIACRAWLER3GB</code> to get <strong>3 GB</strong> of free traffic. 👉 <a href="https://proxylane.dev/redeem?code=MEDIACRAWLER3GB&utm_source=mediacrawler&utm_medium=partnership&utm_campaign=mediacrawler_sponsor_202610&utm_content=github_readme_en">Claim 3 GB free</a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://proxy-seller.com/?partner=72D769D7B7FB4A8B"><img src="docs/static/images/proxy_seller_logo.png" width="180" alt="Proxy-Seller"></a>
+      </td>
+      <td valign="middle">
+        <a href="https://proxy-seller.com/?partner=72D769D7B7FB4A8B">Proxy-Seller</a> is a professional proxy provider for web scraping, data collection and automation, offering five product lines — residential, mobile (4G/5G/LTE), static ISP, and datacenter IPv4 and IPv6 — covering 220+ locations worldwide with 47M+ residential IPs and precise targeting by country, city and ISP. Key benefits include 99.7% uptime, full HTTP(S) and SOCKS5 support, flexible switching between static and rotating IPs, high-concurrency request handling, a RESTful API and multi-language SDKs (Python, Node.js, PHP, Java, Go), plus 24/7 technical support. Certified to ISO/IEC 27001 and ISO 9001 and trusted by 185,000+ customers worldwide, it works well with MediaCrawler and other multi-platform scraping tools. MediaCrawler users get 15% off with code <code>MCRAWLER15</code>. 👉 <a href="https://proxy-seller.com/?partner=72D769D7B7FB4A8B">Visit Proxy-Seller</a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://dragtokens.com"><img src="docs/static/images/dragtokens_logo.jpg" width="180" alt="DragTokens"></a>
+      </td>
+      <td valign="middle">
+        Thanks to <a href="https://dragtokens.com">DragTokens (Drag API)</a> for sponsoring this project! DragTokens focuses on providing developers with a multi-model API relay service, supporting AI coding tools such as Claude Code, Codex, and Gemini CLI, and covering leading models including GPT, Claude, and Gemini. Rates are as low as 1.1x for the Claude official-client-dedicated group (about 1.55 discount vs. the official API, saving ~84.5%), 0.3x for Codex (about 0.42 discount, saving ~96%), and 0.25x for Gemini (about 0.35 discount, saving ~96.5%), with peak pool throughput reaching 700 million TPM.<br><br>
+        🎁 New users who <a href="https://dragtokens.com">register through this exclusive link</a> receive a sign-up credit, and a single top-up of CNY 100 also earns 10% cash back! Documentation covers getting started, tool configuration, and API examples, so setup and usage both come with guidance. Prompts and model responses are never stored, and dedicated account pools, corporate transfer, and invoicing are available for enterprise and university teams.
+      </td>
+    </tr>
+  </tbody>
+</table>
 
+---
 
 ### 🤝 Become a Sponsor
 
@@ -261,10 +357,27 @@ Become a sponsor and showcase your product here, getting massive exposure daily!
 **Contact Information**:
 - WeChat: `relakkes`
 - Email: `relakkes@gmail.com`
+---
+
+### 📚 Other
+- **FAQ**: [MediaCrawler Complete Documentation](https://nanmicoder.github.io/MediaCrawler/)
+
+### 🧩 My Other Projects
+- **The Startup I'm Building**: [ModelDial](https://modeldial.com/?utm_source=github&utm_medium=referral&utm_campaign=mediacrawler&utm_content=readme-en) — benchmarks AI models on private datasets, comparing capabilities, costs and reasoning effort levels to help you find the right model for your tasks
+- **Open Source Desktop Agent**: [cc-haha](https://github.com/NanmiCoder/cc-haha) — a local-first, cross-platform desktop workspace for agents, with multi-agent collaboration, Git worktrees, a skill marketplace, multi-model support and Computer Use, plus remote access via WeChat / Feishu / DingTalk and more
+- **DeepSeek Harness Plugin**: [dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) — brings Agent Teams to DeepSeek Harness, so multiple agents can work in parallel on complex tasks
+
+
+## ⭐ Star Trend Chart
+
+If this project helps you, please give a ⭐ Star to support and let more people see MediaCrawler!
+
+[![Star History Chart](https://www.repostars.dev/api/embed?repo=NanmiCoder%2FMediaCrawler&theme=ocean)](https://www.repostars.dev/?repos=NanmiCoder%2FMediaCrawler&theme=ocean)
 
 
 ## 📚 References
 
+- **Xiaohongshu Signature Repository**: [Cloxl's xhs signature repository](https://github.com/Cloxl/xhshow)
 - **Xiaohongshu Client**: [ReaJason's xhs repository](https://github.com/ReaJason/xhs)
 - **SMS Forwarding**: [SmsForwarder reference repository](https://github.com/pppscn/SmsForwarder)
 - **Intranet Penetration Tool**: [ngrok official documentation](https://ngrok.com/docs/)

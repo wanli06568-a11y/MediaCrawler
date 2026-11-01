@@ -33,12 +33,14 @@ from playwright.async_api import (
 
 import config
 from base.base_crawler import AbstractCrawler
+from media_downloader import MediaDownloader
 from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import douyin as douyin_store
 from tools import utils
 from tools.cdp_browser import CDPBrowserManager
 from var import crawler_type_var, source_keyword_var
 
+from . import media as douyin_media
 from .client import DouYinClient
 from .exception import DataFetchError
 from .field import PublishTimeType
@@ -54,8 +56,16 @@ class DouYinCrawler(AbstractCrawler):
 
     def __init__(self) -> None:
         self.index_url = "https://www.douyin.com"
+        self.cookie_urls = [
+            "https://douyin.com",
+            self.index_url,
+            "https://creator.douyin.com",
+            "https://douhot.douyin.com",
+            "https://live.douyin.com",
+        ]
         self.cdp_manager = None
-        self.ip_proxy_pool = None  # 代理IP池，用于代理自动刷新
+        self.ip_proxy_pool = None  # Proxy IP pool for automatic proxy refresh
+        self._media_downloader: Optional[MediaDownloader] = None
 
     async def start(self) -> None:
         playwright_proxy_format, httpx_proxy_format = None, None
@@ -65,7 +75,7 @@ class DouYinCrawler(AbstractCrawler):
             playwright_proxy_format, httpx_proxy_format = utils.format_proxy_info(ip_proxy_info)
 
         async with async_playwright() as playwright:
-            # 根据配置选择启动模式
+            # Select startup mode based on configuration
             if config.ENABLE_CDP_MODE:
                 utils.logger.info("[DouYinCrawler] 使用CDP模式启动浏览器")
                 self.browser_context = await self.launch_browser_with_cdp(
@@ -100,7 +110,10 @@ class DouYinCrawler(AbstractCrawler):
                     cookie_str=config.COOKIES,
                 )
                 await login_obj.begin()
-                await self.dy_client.update_cookies(browser_context=self.browser_context)
+                await self.dy_client.update_cookies(
+                    browser_context=self.browser_context,
+                    urls=self.cookie_urls,
+                )
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":
                 # Search for notes and retrieve their comment information.
@@ -151,19 +164,24 @@ class DouYinCrawler(AbstractCrawler):
                     utils.logger.error(f"[DouYinCrawler.search] search douyin keyword: {keyword} failed，账号也许被风控了。")
                     break
                 dy_search_id = posts_res.get("extra", {}).get("logid", "")
+                page_aweme_list = []
                 for post_item in posts_res.get("data"):
                     try:
                         aweme_info: Dict = (post_item.get("aweme_info") or post_item.get("aweme_mix_info", {}).get("mix_items")[0])
                     except TypeError:
                         continue
                     aweme_list.append(aweme_info.get("aweme_id", ""))
+                    page_aweme_list.append(aweme_info.get("aweme_id", ""))
                     await douyin_store.update_douyin_aweme(aweme_item=aweme_info)
-                    await self.get_aweme_media(aweme_item=aweme_info)
+                    await self.download_media(aweme_item=aweme_info)
+                
+                # Batch get note comments for the current page
+                await self.batch_get_note_comments(page_aweme_list)
+
                 # Sleep after each page navigation
                 await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
                 utils.logger.info(f"[DouYinCrawler.search] Sleeping for {config.CRAWLER_MAX_SLEEP_SEC} seconds after page {page-1}")
             utils.logger.info(f"[DouYinCrawler.search] keyword:{keyword}, aweme_list:{aweme_list}")
-            await self.batch_get_note_comments(aweme_list)
 
     async def get_specified_awemes(self):
         """Get the information and comments of the specified post from URLs or IDs"""
@@ -173,12 +191,12 @@ class DouYinCrawler(AbstractCrawler):
             try:
                 video_info = parse_video_info_from_url(video_url)
 
-                # 处理短链接
+                # Handling short links
                 if video_info.url_type == "short":
                     utils.logger.info(f"[DouYinCrawler.get_specified_awemes] Resolving short link: {video_url}")
                     resolved_url = await self.dy_client.resolve_short_url(video_url)
                     if resolved_url:
-                        # 从解析后的URL中提取视频ID
+                        # Extract video ID from parsed URL
                         video_info = parse_video_info_from_url(resolved_url)
                         utils.logger.info(f"[DouYinCrawler.get_specified_awemes] Short link resolved to aweme ID: {video_info.aweme_id}")
                     else:
@@ -197,7 +215,7 @@ class DouYinCrawler(AbstractCrawler):
         for aweme_detail in aweme_details:
             if aweme_detail is not None:
                 await douyin_store.update_douyin_aweme(aweme_item=aweme_detail)
-                await self.get_aweme_media(aweme_item=aweme_detail)
+                await self.download_media(aweme_item=aweme_detail)
         await self.batch_get_note_comments(aweme_id_list)
 
     async def get_aweme_detail(self, aweme_id: str, semaphore: asyncio.Semaphore) -> Any:
@@ -235,7 +253,7 @@ class DouYinCrawler(AbstractCrawler):
     async def get_comments(self, aweme_id: str, semaphore: asyncio.Semaphore) -> None:
         async with semaphore:
             try:
-                # 将关键词列表传递给 get_aweme_all_comments 方法
+                # Pass the list of keywords to the get_aweme_all_comments method
                 # Use fixed crawling interval
                 crawl_interval = config.CRAWLER_MAX_SLEEP_SEC
                 await self.dy_client.get_aweme_all_comments(
@@ -289,11 +307,14 @@ class DouYinCrawler(AbstractCrawler):
         for aweme_item in note_details:
             if aweme_item is not None:
                 await douyin_store.update_douyin_aweme(aweme_item=aweme_item)
-                await self.get_aweme_media(aweme_item=aweme_item)
+                await self.download_media(aweme_item=aweme_item)
 
     async def create_douyin_client(self, httpx_proxy: Optional[str]) -> DouYinClient:
         """Create douyin client"""
-        cookie_str, cookie_dict = utils.convert_cookies(await self.browser_context.cookies())  # type: ignore
+        cookie_str, cookie_dict = await utils.convert_browser_context_cookies(
+            self.browser_context,
+            urls=self.cookie_urls,
+        )  # type: ignore
         douyin_client = DouYinClient(
             proxy=httpx_proxy,
             headers={
@@ -306,7 +327,7 @@ class DouYinCrawler(AbstractCrawler):
             },
             playwright_page=self.context_page,
             cookie_dict=cookie_dict,
-            proxy_ip_pool=self.ip_proxy_pool,  # 传递代理池用于自动刷新
+            proxy_ip_pool=self.ip_proxy_pool,  # Pass proxy pool for automatic refresh
         )
         return douyin_client
 
@@ -356,10 +377,10 @@ class DouYinCrawler(AbstractCrawler):
                 headless=headless,
             )
 
-            # 添加反检测脚本
+            # Add anti-detection script
             await self.cdp_manager.add_stealth_script()
 
-            # 显示浏览器信息
+            # Show browser information
             browser_info = await self.cdp_manager.get_browser_info()
             utils.logger.info(f"[DouYinCrawler] CDP浏览器信息: {browser_info}")
 
@@ -367,13 +388,13 @@ class DouYinCrawler(AbstractCrawler):
 
         except Exception as e:
             utils.logger.error(f"[DouYinCrawler] CDP模式启动失败，回退到标准模式: {e}")
-            # 回退到标准模式
+            # Fall back to standard mode
             chromium = playwright.chromium
             return await self.launch_browser(chromium, playwright_proxy, user_agent, headless)
 
     async def close(self) -> None:
         """Close browser context"""
-        # 如果使用CDP模式，需要特殊处理
+        # If you use CDP mode, special processing is required
         if self.cdp_manager:
             await self.cdp_manager.cleanup()
             self.cdp_manager = None
@@ -381,72 +402,44 @@ class DouYinCrawler(AbstractCrawler):
             await self.browser_context.close()
         utils.logger.info("[DouYinCrawler.close] Browser context closed ...")
 
-    async def get_aweme_media(self, aweme_item: Dict):
-        """
-        获取抖音媒体，自动判断媒体类型是短视频还是帖子图片并下载
+    async def download_media(self, aweme_item: Dict) -> None:
+        """下载抖音作品的媒体资源（图集图片，或视频 + 封面）
 
         Args:
             aweme_item (Dict): 抖音作品详情
         """
-        if not config.ENABLE_GET_MEIDAS:
-            utils.logger.info(f"[DouYinCrawler.get_aweme_media] Crawling image mode is not enabled")
+        if not config.ENABLE_GET_MEDIA:
             return
-        # 笔记 urls 列表，若为短视频类型则返回为空列表
-        note_download_url: List[str] = douyin_store._extract_note_image_list(aweme_item)
-        # 视频 url，永远存在，但为短视频类型时的文件其实是音频文件
-        video_download_url: str = douyin_store._extract_video_download_url(aweme_item)
-        # TODO: 抖音并没采用音视频分离的策略，故音频可从原视频中分离，暂不提取
-        if note_download_url:
-            await self.get_aweme_images(aweme_item)
+        try:
+            items = douyin_media.build_media_items(aweme_item)
+            if items:
+                await self._get_media_downloader().download_all(items)
+        except Exception as exc:
+            # 媒体下载是旁路能力，解析异常/网络异常都不能中断爬取主流程
+            utils.logger.error(f"[DouYinCrawler.download_media] 媒体下载异常: {exc}")
+
+    def _get_media_downloader(self) -> MediaDownloader:
+        """惰性创建媒体下载器，并同步最新的代理与 UA（代理池是就地刷新的）"""
+        if self._media_downloader is None:
+            self._media_downloader = MediaDownloader(
+                platform="dy",
+                proxy=getattr(self.dy_client, "proxy", None),
+                extra_headers=self._media_headers(),
+            )
         else:
-            await self.get_aweme_video(aweme_item)
+            self._media_downloader.update_credentials(
+                proxy=getattr(self.dy_client, "proxy", None),
+                extra_headers=self._media_headers(),
+            )
+        return self._media_downloader
 
-    async def get_aweme_images(self, aweme_item: Dict):
+    def _media_headers(self) -> Dict:
+        """媒体请求头：平台 Referer（防盗链）+ UA。
+
+        client.headers 里含 Cookie，不能整体透传到 CDN 请求上，因此只取 UA。
         """
-        get aweme images. please use get_aweme_media
-
-        Args:
-            aweme_item (Dict): 抖音作品详情
-        """
-        if not config.ENABLE_GET_MEIDAS:
-            return
-        aweme_id = aweme_item.get("aweme_id")
-        # 笔记 urls 列表，若为短视频类型则返回为空列表
-        note_download_url: List[str] = douyin_store._extract_note_image_list(aweme_item)
-
-        if not note_download_url:
-            return
-        picNum = 0
-        for url in note_download_url:
-            if not url:
-                continue
-            content = await self.dy_client.get_aweme_media(url)
-            await asyncio.sleep(random.random())
-            if content is None:
-                continue
-            extension_file_name = f"{picNum:>03d}.jpeg"
-            picNum += 1
-            await douyin_store.update_dy_aweme_image(aweme_id, content, extension_file_name)
-
-    async def get_aweme_video(self, aweme_item: Dict):
-        """
-        get aweme videos. please use get_aweme_media
-
-        Args:
-            aweme_item (Dict): 抖音作品详情
-        """
-        if not config.ENABLE_GET_MEIDAS:
-            return
-        aweme_id = aweme_item.get("aweme_id")
-
-        # 视频 url，永远存在，但为短视频类型时的文件其实是音频文件
-        video_download_url: str = douyin_store._extract_video_download_url(aweme_item)
-
-        if not video_download_url:
-            return
-        content = await self.dy_client.get_aweme_media(video_download_url)
-        await asyncio.sleep(random.random())
-        if content is None:
-            return
-        extension_file_name = f"video.mp4"
-        await douyin_store.update_dy_aweme_video(aweme_id, content, extension_file_name)
+        headers = {"Referer": "https://www.douyin.com/"}
+        client_headers = getattr(self.dy_client, "headers", {}) or {}
+        if client_headers.get("User-Agent"):
+            headers["User-Agent"] = client_headers["User-Agent"]
+        return headers

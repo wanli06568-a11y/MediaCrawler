@@ -18,7 +18,7 @@
 
 # @Author  : persist1@126.com
 # @Time    : 2025/9/5 19:34
-# @Desc    : 小红书存储实现类
+# @Desc    : Xiaohongshu storage implementation class
 import json
 import os
 from datetime import datetime
@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from base.base_crawler import AbstractStore
 from database.db_session import get_session
-from database.models import XhsNote, XhsNoteComment, XhsCreator
+from database.models import XhsNote, XhsNoteComment
 
 from tools.async_file_writer import AsyncFileWriter
 from tools.time_util import get_current_timestamp
@@ -101,6 +101,24 @@ class XhsJsonStoreImplement(AbstractStore):
 
 
 
+class XhsJsonlStoreImplement(AbstractStore):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.writer = AsyncFileWriter(platform="xhs", crawler_type=crawler_type_var.get())
+
+    async def store_content(self, content_item: Dict):
+        await self.writer.write_to_jsonl(item_type="contents", item=content_item)
+
+    async def store_comment(self, comment_item: Dict):
+        await self.writer.write_to_jsonl(item_type="comments", item=comment_item)
+
+    async def store_creator(self, creator_item: Dict):
+        pass
+
+    def flush(self):
+        pass
+
+
 class XhsDbStoreImplement(AbstractStore):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -119,10 +137,8 @@ class XhsDbStoreImplement(AbstractStore):
         add_ts = int(get_current_timestamp())
         last_modify_ts = int(get_current_timestamp())
         note = XhsNote(
-            user_id=content_item.get("user_id"),
+            creator_hash=content_item.get("creator_hash"),
             nickname=content_item.get("nickname"),
-            avatar=content_item.get("avatar"),
-            ip_location=content_item.get("ip_location"),
             add_ts=add_ts,
             last_modify_ts=last_modify_ts,
             note_id=content_item.get("note_id"),
@@ -179,19 +195,17 @@ class XhsDbStoreImplement(AbstractStore):
         add_ts = int(get_current_timestamp())
         last_modify_ts = int(get_current_timestamp())
         comment = XhsNoteComment(
-            user_id=comment_item.get("user_id"),
+            creator_hash=comment_item.get("creator_hash"),
             nickname=comment_item.get("nickname"),
-            avatar=comment_item.get("avatar"),
-            ip_location=comment_item.get("ip_location"),
             add_ts=add_ts,
             last_modify_ts=last_modify_ts,
             comment_id=comment_item.get("comment_id"),
             create_time=comment_item.get("create_time"),
             note_id=comment_item.get("note_id"),
             content=comment_item.get("content"),
-            sub_comment_count=comment_item.get("sub_comment_count"),
+            sub_comment_count=int(comment_item.get("sub_comment_count", 0) or 0),
             pictures=json.dumps(comment_item.get("pictures")),
-            parent_comment_id=comment_item.get("parent_comment_id"),
+            parent_comment_id=str(comment_item.get("parent_comment_id", "")),
             like_count=str(comment_item.get("like_count"))
         )
         session.add(comment)
@@ -202,7 +216,7 @@ class XhsDbStoreImplement(AbstractStore):
         update_data = {
             "last_modify_ts": last_modify_ts,
             "like_count": str(comment_item.get("like_count")),
-            "sub_comment_count": comment_item.get("sub_comment_count"),
+            "sub_comment_count": int(comment_item.get("sub_comment_count", 0) or 0),
         }
         stmt = update(XhsNoteComment).where(XhsNoteComment.comment_id == comment_id).values(**update_data)
         await session.execute(stmt)
@@ -213,54 +227,8 @@ class XhsDbStoreImplement(AbstractStore):
         return result.first() is not None
 
     async def store_creator(self, creator_item: Dict):
-        user_id = creator_item.get("user_id")
-        if not user_id:
-            return
-        async with get_session() as session:
-            if await self.creator_is_exist(session, user_id):
-                await self.update_creator(session, creator_item)
-            else:
-                await self.add_creator(session, creator_item)
-
-    async def add_creator(self, session: AsyncSession, creator_item: Dict):
-        add_ts = int(get_current_timestamp())
-        last_modify_ts = int(get_current_timestamp())
-        creator = XhsCreator(
-            user_id=creator_item.get("user_id"),
-            nickname=creator_item.get("nickname"),
-            avatar=creator_item.get("avatar"),
-            ip_location=creator_item.get("ip_location"),
-            add_ts=add_ts,
-            last_modify_ts=last_modify_ts,
-            desc=creator_item.get("desc"),
-            gender=creator_item.get("gender"),
-            follows=str(creator_item.get("follows")),
-            fans=str(creator_item.get("fans")),
-            interaction=str(creator_item.get("interaction")),
-            tag_list=json.dumps(creator_item.get("tag_list"))
-        )
-        session.add(creator)
-
-    async def update_creator(self, session: AsyncSession, creator_item: Dict):
-        user_id = creator_item.get("user_id")
-        last_modify_ts = int(get_current_timestamp())
-        update_data = {
-            "last_modify_ts": last_modify_ts,
-            "nickname": creator_item.get("nickname"),
-            "avatar": creator_item.get("avatar"),
-            "desc": creator_item.get("desc"),
-            "follows": str(creator_item.get("follows")),
-            "fans": str(creator_item.get("fans")),
-            "interaction": str(creator_item.get("interaction")),
-            "tag_list": json.dumps(creator_item.get("tag_list"))
-        }
-        stmt = update(XhsCreator).where(XhsCreator.user_id == user_id).values(**update_data)
-        await session.execute(stmt)
-
-    async def creator_is_exist(self, session: AsyncSession, user_id: str) -> bool:
-        stmt = select(XhsCreator).where(XhsCreator.user_id == user_id)
-        result = await session.execute(stmt)
-        return result.first() is not None
+        # 教学版：创作者个人资料不再落库
+        pass
 
     async def get_all_content(self) -> List[Dict]:
         async with get_session() as session:
@@ -281,7 +249,7 @@ class XhsSqliteStoreImplement(XhsDbStoreImplement):
 
 
 class XhsMongoStoreImplement(AbstractStore):
-    """小红书MongoDB存储实现"""
+    """Xiaohongshu MongoDB storage implementation"""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -289,9 +257,9 @@ class XhsMongoStoreImplement(AbstractStore):
 
     async def store_content(self, content_item: Dict):
         """
-        存储笔记内容到MongoDB
+        Store note content to MongoDB
         Args:
-            content_item: 笔记内容数据
+            content_item: Note content data
         """
         note_id = content_item.get("note_id")
         if not note_id:
@@ -306,9 +274,9 @@ class XhsMongoStoreImplement(AbstractStore):
 
     async def store_comment(self, comment_item: Dict):
         """
-        存储评论到MongoDB
+        Store comment to MongoDB
         Args:
-            comment_item: 评论数据
+            comment_item: Comment data
         """
         comment_id = comment_item.get("comment_id")
         if not comment_id:
@@ -323,24 +291,16 @@ class XhsMongoStoreImplement(AbstractStore):
 
     async def store_creator(self, creator_item: Dict):
         """
-        存储创作者信息到MongoDB
+        Store creator information to MongoDB
         Args:
-            creator_item: 创作者数据
+            creator_item: Creator data
         """
-        user_id = creator_item.get("user_id")
-        if not user_id:
-            return
-
-        await self.mongo_store.save_or_update(
-            collection_suffix="creators",
-            query={"user_id": user_id},
-            data=creator_item
-        )
-        utils.logger.info(f"[XhsMongoStoreImplement.store_creator] Saved creator {user_id} to MongoDB")
+        # 教学版：创作者个人资料不再落库
+        pass
 
 
 class XhsExcelStoreImplement:
-    """小红书Excel存储实现 - 全局单例"""
+    """Xiaohongshu Excel storage implementation - Global singleton"""
 
     def __new__(cls, *args, **kwargs):
         from store.excel_store_base import ExcelStoreBase

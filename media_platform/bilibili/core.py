@@ -20,10 +20,11 @@
 # -*- coding: utf-8 -*-
 # @Author  : relakkes@gmail.com
 # @Time    : 2023/12/2 18:44
-# @Desc    : B站爬虫
+# @Desc    : Bilibili Crawler
 
 import asyncio
 import os
+import sys
 # import random  # Removed as we now use fixed config.CRAWLER_MAX_SLEEP_SEC intervals
 from asyncio import Task
 from typing import Dict, List, Optional, Tuple, Union
@@ -41,12 +42,14 @@ from playwright._impl._errors import TargetClosedError
 
 import config
 from base.base_crawler import AbstractCrawler
+from media_downloader import MediaDownloader, is_ffmpeg_available
 from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import bilibili as bilibili_store
 from tools import utils
 from tools.cdp_browser import CDPBrowserManager
 from var import crawler_type_var, source_keyword_var
 
+from . import media as bili_media
 from .client import BilibiliClient
 from .exception import DataFetchError
 from .field import SearchOrderType
@@ -62,9 +65,11 @@ class BilibiliCrawler(AbstractCrawler):
 
     def __init__(self):
         self.index_url = "https://www.bilibili.com"
+        self.cookie_urls = [self.index_url]
         self.user_agent = utils.get_user_agent()
         self.cdp_manager = None
-        self.ip_proxy_pool = None  # 代理IP池，用于代理自动刷新
+        self.ip_proxy_pool = None  # Proxy IP pool for automatic proxy refresh
+        self._media_downloader: Optional[MediaDownloader] = None
 
     async def start(self):
         playwright_proxy_format, httpx_proxy_format = None, None
@@ -74,9 +79,9 @@ class BilibiliCrawler(AbstractCrawler):
             playwright_proxy_format, httpx_proxy_format = utils.format_proxy_info(ip_proxy_info)
 
         async with async_playwright() as playwright:
-            # 根据配置选择启动模式
+            # Choose launch mode based on configuration
             if config.ENABLE_CDP_MODE:
-                utils.logger.info("[BilibiliCrawler] 使用CDP模式启动浏览器")
+                utils.logger.info("[BilibiliCrawler] Launching browser using CDP mode")
                 self.browser_context = await self.launch_browser_with_cdp(
                     playwright,
                     playwright_proxy_format,
@@ -84,7 +89,7 @@ class BilibiliCrawler(AbstractCrawler):
                     headless=config.CDP_HEADLESS,
                 )
             else:
-                utils.logger.info("[BilibiliCrawler] 使用标准模式启动浏览器")
+                utils.logger.info("[BilibiliCrawler] Launching browser using standard mode")
                 # Launch a browser context.
                 chromium = playwright.chromium
                 self.browser_context = await self.launch_browser(chromium, None, self.user_agent, headless=config.HEADLESS)
@@ -105,7 +110,19 @@ class BilibiliCrawler(AbstractCrawler):
                     cookie_str=config.COOKIES,
                 )
                 await login_obj.begin()
-                await self.bili_client.update_cookies(browser_context=self.browser_context)
+                await self.bili_client.update_cookies(
+                    browser_context=self.browser_context,
+                    urls=self.cookie_urls,
+                )
+                # 登录流程结束后再校验一次，宁可在这里失败也不要带着未登录状态跑完全程：
+                # B 站的清晰度由 playurl 依据 Cookie 决定，死会话不会报错，
+                # 只会把带 get_media 的视频静默限制在 480P
+                if not await self.bili_client.pong():
+                    utils.logger.error(
+                        "[BilibiliCrawler.start] 登录流程结束后仍未登录：请确认扫码已完成、"
+                        "或 config.COOKIES 是否有效。已终止，否则视频会被静默限制在 480P。"
+                    )
+                    sys.exit(1)
 
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":
@@ -149,31 +166,31 @@ class BilibiliCrawler(AbstractCrawler):
         end: str = config.END_DAY,
     ) -> Tuple[str, str]:
         """
-        获取 bilibili 作品发布日期起始时间戳 pubtime_begin_s 与发布日期结束时间戳 pubtime_end_s
+        Get bilibili publish start timestamp pubtime_begin_s and publish end timestamp pubtime_end_s
         ---
-        :param start: 发布日期起始时间，YYYY-MM-DD
-        :param end: 发布日期结束时间，YYYY-MM-DD
+        :param start: Publish date start time, YYYY-MM-DD
+        :param end: Publish date end time, YYYY-MM-DD
 
         Note
         ---
-        - 搜索的时间范围为 start 至 end，包含 start 和 end
-        - 若要搜索同一天的内容，为了包含 start 当天的搜索内容，则 pubtime_end_s 的值应该为 pubtime_begin_s 的值加上一天再减去一秒，即 start 当天的最后一秒
-            - 如仅搜索 2024-01-05 的内容，pubtime_begin_s = 1704384000，pubtime_end_s = 1704470399
-              转换为可读的 datetime 对象：pubtime_begin_s = datetime.datetime(2024, 1, 5, 0, 0)，pubtime_end_s = datetime.datetime(2024, 1, 5, 23, 59, 59)
-        - 若要搜索 start 至 end 的内容，为了包含 end 当天的搜索内容，则 pubtime_end_s 的值应该为 pubtime_end_s 的值加上一天再减去一秒，即 end 当天的最后一秒
-            - 如搜索 2024-01-05 - 2024-01-06 的内容，pubtime_begin_s = 1704384000，pubtime_end_s = 1704556799
-              转换为可读的 datetime 对象：pubtime_begin_s = datetime.datetime(2024, 1, 5, 0, 0)，pubtime_end_s = datetime.datetime(2024, 1, 6, 23, 59, 59)
+        - Search time range is from start to end, including both start and end
+        - To search content from the same day, to include search content from that day, pubtime_end_s should be pubtime_begin_s plus one day minus one second, i.e., the last second of start day
+            - For example, searching only 2024-01-05 content, pubtime_begin_s = 1704384000, pubtime_end_s = 1704470399
+              Converted to readable datetime objects: pubtime_begin_s = datetime.datetime(2024, 1, 5, 0, 0), pubtime_end_s = datetime.datetime(2024, 1, 5, 23, 59, 59)
+        - To search content from start to end, to include search content from end day, pubtime_end_s should be pubtime_end_s plus one day minus one second, i.e., the last second of end day
+            - For example, searching 2024-01-05 - 2024-01-06 content, pubtime_begin_s = 1704384000, pubtime_end_s = 1704556799
+              Converted to readable datetime objects: pubtime_begin_s = datetime.datetime(2024, 1, 5, 0, 0), pubtime_end_s = datetime.datetime(2024, 1, 6, 23, 59, 59)
         """
-        # 转换 start 与 end 为 datetime 对象
+        # Convert start and end to datetime objects
         start_day: datetime = datetime.strptime(start, "%Y-%m-%d")
         end_day: datetime = datetime.strptime(end, "%Y-%m-%d")
         if start_day > end_day:
             raise ValueError("Wrong time range, please check your start and end argument, to ensure that the start cannot exceed end")
-        elif start_day == end_day:  # 搜索同一天的内容
-            end_day = (start_day + timedelta(days=1) - timedelta(seconds=1))  # 则将 end_day 设置为 start_day + 1 day - 1 second
-        else:  # 搜索 start 至 end
-            end_day = (end_day + timedelta(days=1) - timedelta(seconds=1))  # 则将 end_day 设置为 end_day + 1 day - 1 second
-        # 将其重新转换为时间戳
+        elif start_day == end_day:  # Searching content from the same day
+            end_day = (start_day + timedelta(days=1) - timedelta(seconds=1))  # Set end_day to start_day + 1 day - 1 second
+        else:  # Searching from start to end
+            end_day = (end_day + timedelta(days=1) - timedelta(seconds=1))  # Set end_day to end_day + 1 day - 1 second
+        # Convert back to timestamps
         return str(int(start_day.timestamp())), str(int(end_day.timestamp()))
 
     async def search_by_keywords(self):
@@ -203,8 +220,8 @@ class BilibiliCrawler(AbstractCrawler):
                     page=page,
                     page_size=bili_limit_count,
                     order=SearchOrderType.DEFAULT,
-                    pubtime_begin_s=0,  # 作品发布日期起始时间戳
-                    pubtime_end_s=0,  # 作品发布日期结束日期时间戳
+                    pubtime_begin_s=0,  # Publish date start timestamp
+                    pubtime_end_s=0,  # Publish date end timestamp
                 )
                 video_list: List[Dict] = videos_res.get("result")
 
@@ -224,7 +241,7 @@ class BilibiliCrawler(AbstractCrawler):
                         video_id_list.append(video_item.get("View").get("aid"))
                         await bilibili_store.update_bilibili_video(video_item)
                         await bilibili_store.update_up_info(video_item)
-                        await self.get_bilibili_video(video_item, semaphore)
+                        await self.download_media(video_item, semaphore)
                 page += 1
 
                 # Sleep after page navigation
@@ -304,7 +321,7 @@ class BilibiliCrawler(AbstractCrawler):
                                 video_id_list.append(video_item.get("View").get("aid"))
                                 await bilibili_store.update_bilibili_video(video_item)
                                 await bilibili_store.update_up_info(video_item)
-                                await self.get_bilibili_video(video_item, semaphore)
+                                await self.download_media(video_item, semaphore)
 
                         page += 1
 
@@ -409,7 +426,7 @@ class BilibiliCrawler(AbstractCrawler):
                     video_aids_list.append(video_aid)
                 await bilibili_store.update_bilibili_video(video_detail)
                 await bilibili_store.update_up_info(video_detail)
-                await self.get_bilibili_video(video_detail, semaphore)
+                await self.download_media(video_detail, semaphore)
         await self.batch_get_video_comments(video_aids_list)
 
     async def get_video_info_task(self, aid: int, bvid: str, semaphore: asyncio.Semaphore) -> Optional[Dict]:
@@ -436,17 +453,24 @@ class BilibiliCrawler(AbstractCrawler):
                 utils.logger.error(f"[BilibiliCrawler.get_video_info_task] have not fund note detail video_id:{bvid}, err: {ex}")
                 return None
 
-    async def get_video_play_url_task(self, aid: int, cid: int, semaphore: asyncio.Semaphore) -> Union[Dict, None]:
+    async def get_video_play_url_task(
+        self,
+        aid: int,
+        cid: int,
+        semaphore: asyncio.Semaphore,
+        fnval: int = bili_media.DASH_FNVAL,
+    ) -> Union[Dict, None]:
         """
         Get video play url
         :param aid:
         :param cid:
         :param semaphore:
+        :param fnval: 媒体格式位掩码，默认请求 DASH 分轨流
         :return:
         """
         async with semaphore:
             try:
-                result = await self.bili_client.get_video_play_url(aid=aid, cid=cid)
+                result = await self.bili_client.get_video_play_url(aid=aid, cid=cid, fnval=fnval)
                 return result
             except DataFetchError as ex:
                 utils.logger.error(f"[BilibiliCrawler.get_video_play_url_task] Get video play url error: {ex}")
@@ -462,7 +486,10 @@ class BilibiliCrawler(AbstractCrawler):
         :return: bilibili client
         """
         utils.logger.info("[BilibiliCrawler.create_bilibili_client] Begin create bilibili API client ...")
-        cookie_str, cookie_dict = utils.convert_cookies(await self.browser_context.cookies())
+        cookie_str, cookie_dict = await utils.convert_browser_context_cookies(
+            self.browser_context,
+            urls=self.cookie_urls,
+        )
         bilibili_client_obj = BilibiliClient(
             proxy=httpx_proxy,
             headers={
@@ -474,7 +501,7 @@ class BilibiliCrawler(AbstractCrawler):
             },
             playwright_page=self.context_page,
             cookie_dict=cookie_dict,
-            proxy_ip_pool=self.ip_proxy_pool,  # 传递代理池用于自动刷新
+            proxy_ip_pool=self.ip_proxy_pool,  # Pass proxy pool for automatic refresh
         )
         return bilibili_client_obj
 
@@ -508,7 +535,7 @@ class BilibiliCrawler(AbstractCrawler):
                     "height": 1080
                 },
                 user_agent=user_agent,
-                channel="chrome",  # 使用系统的Chrome稳定版
+                channel="chrome",  # Use system's stable Chrome version
             )
             return browser_context
         else:
@@ -525,7 +552,7 @@ class BilibiliCrawler(AbstractCrawler):
         headless: bool = True,
     ) -> BrowserContext:
         """
-        使用CDP模式启动浏览器
+        Launch browser using CDP mode
         """
         try:
             self.cdp_manager = CDPBrowserManager()
@@ -536,22 +563,22 @@ class BilibiliCrawler(AbstractCrawler):
                 headless=headless,
             )
 
-            # 显示浏览器信息
+            # Display browser information
             browser_info = await self.cdp_manager.get_browser_info()
-            utils.logger.info(f"[BilibiliCrawler] CDP浏览器信息: {browser_info}")
+            utils.logger.info(f"[BilibiliCrawler] CDP browser info: {browser_info}")
 
             return browser_context
 
         except Exception as e:
-            utils.logger.error(f"[BilibiliCrawler] CDP模式启动失败，回退到标准模式: {e}")
-            # 回退到标准模式
+            utils.logger.error(f"[BilibiliCrawler] CDP mode launch failed, fallback to standard mode: {e}")
+            # Fallback to standard mode
             chromium = playwright.chromium
             return await self.launch_browser(chromium, playwright_proxy, user_agent, headless)
 
     async def close(self):
         """Close browser context"""
         try:
-            # 如果使用CDP模式，需要特殊处理
+            # If using CDP mode, special handling is required
             if self.cdp_manager:
                 await self.cdp_manager.cleanup()
                 self.cdp_manager = None
@@ -563,42 +590,128 @@ class BilibiliCrawler(AbstractCrawler):
         except Exception as e:
             utils.logger.error(f"[BilibiliCrawler.close] An error occurred during close: {e}")
 
-    async def get_bilibili_video(self, video_item: Dict, semaphore: asyncio.Semaphore):
+    async def download_media(self, video_item: Dict, semaphore: asyncio.Semaphore):
+        """下载 B 站视频与封面。
+
+        优先走 DASH（音视频分轨 + ffmpeg 合流，画质最好）；本机没有 ffmpeg
+        或 DASH 流不可用时，降级为 mp4 直链（音视频合一，清晰度受接口限制）。
+
+        :param video_item: 视频详情，需包含 View 字段（含 aid/cid/pic/bvid）
+        :param semaphore: 用于限制 playurl 接口请求并发
         """
-        download bilibili video
-        :param video_item:
-        :param semaphore:
-        :return:
-        """
-        if not config.ENABLE_GET_MEIDAS:
-            utils.logger.info(f"[BilibiliCrawler.get_bilibili_video] Crawling image mode is not enabled")
+        if not config.ENABLE_GET_MEDIA:
             return
-        video_item_view: Dict = video_item.get("View")
+        try:
+            await self._download_media(video_item, semaphore)
+        except Exception as exc:
+            # 媒体下载是旁路能力：playurl 是额外的接口调用，网络抖动不能中断爬取主流程
+            utils.logger.error(f"[BilibiliCrawler.download_media] 媒体下载异常: {exc}")
+
+    async def _download_media(self, video_item: Dict, semaphore: asyncio.Semaphore) -> None:
+        video_item_view: Dict = video_item.get("View") or {}
         aid = video_item_view.get("aid")
         cid = video_item_view.get("cid")
-        result = await self.get_video_play_url_task(aid, cid, semaphore)
-        if result is None:
-            utils.logger.info("[BilibiliCrawler.get_bilibili_video] get video play url failed")
-            return
-        durl_list = result.get("durl")
-        max_size = -1
-        video_url = ""
-        for durl in durl_list:
-            size = durl.get("size")
-            if size > max_size:
-                max_size = size
-                video_url = durl.get("url")
-        if video_url == "":
-            utils.logger.info("[BilibiliCrawler.get_bilibili_video] get video url failed")
+        content_id = video_item_view.get("bvid") or (str(aid) if aid else "")
+        if not content_id:
+            utils.logger.warning("[BilibiliCrawler.download_media] 缺少 aid/bvid，跳过媒体下载")
             return
 
-        content = await self.bili_client.get_video_media(video_url)
-        await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
-        utils.logger.info(f"[BilibiliCrawler.get_bilibili_video] Sleeping for {config.CRAWLER_MAX_SLEEP_SEC} seconds after fetching video {aid}")
-        if content is None:
+        downloader = self._get_media_downloader()
+
+        cover_item = bili_media.build_cover_item(video_item_view, content_id)
+        if cover_item is not None:
+            await downloader.download(cover_item)
+
+        if not aid or not cid:
+            utils.logger.warning("[BilibiliCrawler.download_media] 缺少 aid/cid，无法获取播放地址")
             return
-        extension_file_name = f"video.mp4"
-        await bilibili_store.store_video(aid, content, extension_file_name)
+
+        # ffmpeg 是否可用在请求之前就是确定的（进程内缓存），据此一次性决定 fnval：
+        # 没装 ffmpeg 却先按 DASH 请求一次，既多打一次风控最敏感的 playurl 接口，
+        # 也拿不到可用的 durl
+        dash_supported = is_ffmpeg_available()
+        play_fnval = bili_media.DASH_FNVAL if dash_supported else bili_media.MP4_FNVAL
+        play_info = await self.get_video_play_url_task(aid, cid, semaphore, fnval=play_fnval)
+        await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
+        if play_info is None:
+            utils.logger.error("[BilibiliCrawler.download_media] 获取播放地址失败")
+            return
+
+        if dash_supported:
+            # 逐档降级：未登录或权限不足时 B 站会返回高清晰度 URL，但实际取流被 CDN 403，
+            # 此时退到更低的可用档位往往能成功，比直接放弃（或退回更低质的直链）更好
+            quality: Optional[int] = getattr(config, "BILI_QN", 80)
+            while quality is not None:
+                dash_item = bili_media.build_dash_item(play_info, content_id, preferred_quality=quality)
+                if dash_item is None:
+                    break
+                if await downloader.download(dash_item) is not None:
+                    return
+                lower_quality = bili_media.next_lower_quality(play_info, quality)
+                if lower_quality is None:
+                    break
+                utils.logger.warning(
+                    f"[BilibiliCrawler.download_media] 清晰度 {quality} 取流失败，降级到 {lower_quality}"
+                )
+                quality = lower_quality
+
+            utils.logger.warning("[BilibiliCrawler.download_media] DASH 路径失败，降级为 mp4 直链")
+        else:
+            utils.logger.info("[BilibiliCrawler.download_media] 未检测到 ffmpeg，使用 mp4 直链下载（低清晰度）")
+
+        durl_play_info = play_info
+        durl_item = bili_media.build_durl_item(durl_play_info, content_id)
+        if durl_item is None:
+            # DASH 请求不会返回 durl，需要再按 mp4 格式请求一次
+            durl_play_info = await self.get_video_play_url_task(
+                aid, cid, semaphore, fnval=bili_media.MP4_FNVAL
+            ) or {}
+            await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
+            durl_item = bili_media.build_durl_item(durl_play_info, content_id)
+
+        if durl_item is None:
+            utils.logger.error(
+                f"[BilibiliCrawler.download_media] 未能获取到视频直链 aid={aid} cid={cid}"
+            )
+            return
+
+        segment_count = bili_media.count_durl_segments(durl_play_info)
+        if segment_count > 1:
+            utils.logger.warning(
+                f"[BilibiliCrawler.download_media] 该视频直链被切成 {segment_count} 段，"
+                f"当前仅下载体积最大的一段，文件可能不完整；"
+                f"确认本机 ffmpeg 可用后走 DASH 路径可获取完整视频"
+            )
+
+        await downloader.download(durl_item)
+
+    def _get_media_downloader(self) -> MediaDownloader:
+        """惰性创建媒体下载器，并同步最新的代理与 Cookie（两者都会就地刷新）"""
+        if self._media_downloader is None:
+            self._media_downloader = MediaDownloader(
+                platform="bili",
+                proxy=getattr(self.bili_client, "proxy", None),
+                extra_headers=self._media_headers(),
+            )
+        else:
+            self._media_downloader.update_credentials(
+                proxy=getattr(self.bili_client, "proxy", None),
+                extra_headers=self._media_headers(),
+            )
+        return self._media_downloader
+
+    def _media_headers(self) -> Dict:
+        """媒体请求头：平台 Referer（防盗链）+ UA。
+
+        B 站清晰度由 playurl 接口依据 Cookie 决定，返回的直链里已固化流版本，
+        且带 deadline/upsig 签名，下载本身不需要 Cookie（已实测无 Cookie 可直接取流），
+        因此不透传 Cookie，避免把账号凭证扩散到 CDN 域名。
+        """
+        headers = {"Referer": "https://www.bilibili.com/"}
+        client_headers = getattr(self.bili_client, "headers", {}) or {}
+        if client_headers.get("User-Agent"):
+            headers["User-Agent"] = client_headers["User-Agent"]
+        return headers
 
     async def get_all_creator_details(self, creator_url_list: List[str]):
         """
@@ -639,14 +752,14 @@ class BilibiliCrawler(AbstractCrawler):
         """
         async with semaphore:
             creator_unhandled_info: Dict = await self.bili_client.get_creator_info(creator_id)
+            # 教学版：仅保留动态所需的最少字段(内存临时用)，不持久化创作者个人资料。
             creator_info: Dict = {
                 "id": creator_id,
                 "name": creator_unhandled_info.get("name"),
-                "sign": creator_unhandled_info.get("sign"),
-                "avatar": creator_unhandled_info.get("face"),
             }
-        await self.get_fans(creator_info, semaphore)
-        await self.get_followings(creator_info, semaphore)
+        # 教学版：不再爬取粉丝/关注列表(其他用户的个人信息)，防骚扰。
+        # await self.get_fans(creator_info, semaphore)
+        # await self.get_followings(creator_info, semaphore)
         await self.get_dynamics(creator_info, semaphore)
 
     async def get_fans(self, creator_info: Dict, semaphore: asyncio.Semaphore):

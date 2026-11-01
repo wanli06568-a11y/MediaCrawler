@@ -26,6 +26,7 @@ from typing import List
 
 import config
 from var import source_keyword_var
+from tools.user_hash import anonymize_user_id, mask_nickname
 
 from ._store_impl import *
 
@@ -34,7 +35,9 @@ class KuaishouStoreFactory:
     STORES = {
         "csv": KuaishouCsvStoreImplement,
         "db": KuaishouDbStoreImplement,
+        "postgres": KuaishouDbStoreImplement,
         "json": KuaishouJsonStoreImplement,
+        "jsonl": KuaishouJsonlStoreImplement,
         "sqlite": KuaishouSqliteStoreImplement,
         "mongodb": KuaishouMongoStoreImplement,
         "excel": KuaishouExcelStoreImplement,
@@ -61,9 +64,8 @@ async def update_kuaishou_video(video_item: Dict):
         "title": photo_info.get("caption", "")[:500],
         "desc": photo_info.get("caption", "")[:500],
         "create_time": photo_info.get("timestamp"),
-        "user_id": user_info.get("id"),
-        "nickname": user_info.get("name"),
-        "avatar": user_info.get("headerUrl", ""),
+        "creator_hash": anonymize_user_id(user_info.get("id")),  # 创作者匿名哈希(不存原始 user_id)
+        "nickname": mask_nickname(user_info.get("name")),  # 用户昵称(已脱敏)
         "liked_count": str(photo_info.get("realLikeCount")),
         "viewd_count": str(photo_info.get("viewCount")),
         "last_modify_ts": utils.get_current_timestamp(),
@@ -86,16 +88,21 @@ async def batch_update_ks_video_comments(video_id: str, comments: List[Dict]):
 
 
 async def update_ks_video_comment(video_id: str, comment_item: Dict):
-    comment_id = comment_item.get("commentId")
+    # V2 API uses snake_case field names and comment_id is int type
+    # Old GraphQL API used camelCase field names
+    # Support both formats for backward compatibility
+    comment_id = comment_item.get("comment_id") or comment_item.get("commentId")
     save_comment_item = {
-        "comment_id": comment_id,
+        "comment_id": str(comment_id) if comment_id else None,  # Convert to string for storage
         "create_time": comment_item.get("timestamp"),
         "video_id": video_id,
         "content": comment_item.get("content"),
-        "user_id": comment_item.get("authorId"),
-        "nickname": comment_item.get("authorName"),
-        "avatar": comment_item.get("headurl"),
-        "sub_comment_count": str(comment_item.get("subCommentCount", 0)),
+        # 创作者匿名哈希(不存原始 user_id)：V2: author_id, Old: authorId
+        "creator_hash": anonymize_user_id(comment_item.get("author_id") or comment_item.get("authorId")),
+        # 用户昵称(已脱敏)：V2: author_name, Old: authorName
+        "nickname": mask_nickname(comment_item.get("author_name") or comment_item.get("authorName")),
+        # V2: commentCount, Old: subCommentCount
+        "sub_comment_count": str(comment_item.get("commentCount") or comment_item.get("subCommentCount", 0)),
         "last_modify_ts": utils.get_current_timestamp(),
     }
     utils.logger.info(
@@ -103,20 +110,5 @@ async def update_ks_video_comment(video_id: str, comment_item: Dict):
     await KuaishouStoreFactory.create_store().store_comment(comment_item=save_comment_item)
 
 async def save_creator(user_id: str, creator: Dict):
-    ownerCount = creator.get('ownerCount', {})
-    profile = creator.get('profile', {})
-
-    local_db_item = {
-        'user_id': user_id,
-        'nickname': profile.get('user_name'),
-        'gender': '女' if profile.get('gender') == "F" else '男',
-        'avatar': profile.get('headurl'),
-        'desc': profile.get('user_text'),
-        'ip_location': "",
-        'follows': ownerCount.get("follow"),
-        'fans': ownerCount.get("fan"),
-        'interaction': ownerCount.get("photo_public"),
-        "last_modify_ts": utils.get_current_timestamp(),
-    }
-    utils.logger.info(f"[store.kuaishou.save_creator] creator:{local_db_item}")
-    await KuaishouStoreFactory.create_store().store_creator(local_db_item)
+    # 教学版：创作者个人资料(昵称/性别/头像/签名/IP/粉丝数等)不再落库，防骚扰。
+    return

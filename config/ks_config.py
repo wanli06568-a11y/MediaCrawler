@@ -17,24 +17,27 @@
 # 详细许可条款请参阅项目根目录下的LICENSE文件。
 # 使用本代码即表示您同意遵守上述原则和LICENSE中的所有条款。
 
-# 快手平台配置
+# Kuaishou platform configuration
 
-# 指定快手视频URL列表 (支持完整URL或纯ID)
-# 支持格式:
-# 1. 完整视频URL: "https://www.kuaishou.com/short-video/3x3zxz4mjrsc8ke?authorId=3x84qugg4ch9zhs&streamSource=search"
-# 2. 纯视频ID: "3xf8enb8dbj6uig"
+# Specify Kuaishou video URL list (supports complete URL or pure ID)
+# Supported formats:
+# 1. Full video URL: "https://www.kuaishou.com/short-video/3x3zxz4mjrsc8ke?authorId=3x84qugg4ch9zhs&streamSource=search"
+# 2. Pure video ID: "3xf8enb8dbj6uig"
+# 3. Share short link: "https://www.kuaishou.com/f/X9Idt15MQb9L2cv"
+#    (路径里是 share_token 不是视频 ID，会自动跟随 302 重定向解析)
 KS_SPECIFIED_ID_LIST = [
-    "https://www.kuaishou.com/short-video/3x3zxz4mjrsc8ke?authorId=3x84qugg4ch9zhs&streamSource=search&area=searchxxnull&searchKey=python",
-    "3xf8enb8dbj6uig",
+    "https://www.kuaishou.com/f/X9Idt15MQb9L2cv",
+    "https://www.kuaishou.com/f/X-a8vLyTxvEvN2jg",
+    "a8vLyTxvEvN2jg",
     # ........................
 ]
 
-# 指定快手创作者URL列表 (支持完整URL或纯ID)
-# 支持格式:
-# 1. 创作者主页URL: "https://www.kuaishou.com/profile/3x84qugg4ch9zhs"
-# 2. 纯user_id: "3x4sm73aye7jq7i"
+# Specify Kuaishou creator URL list (supports full URL or pure ID)
+# Supported formats:
+# 1. Creator homepage URL: "https://www.kuaishou.com/profile/3x84qugg4ch9zhs"
+# 2. Pure user_id: "3x4sm73aye7jq7i"
 KS_CREATOR_ID_LIST = [
-    "https://www.kuaishou.com/profile/3x84qugg4ch9zhs",
+    "https://www.kuaishou.com/profile/3xf79edg9msa85c",
     "3x4sm73aye7jq7i",
     # ........................
 ]

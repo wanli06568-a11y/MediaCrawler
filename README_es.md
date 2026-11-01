@@ -1,24 +1,30 @@
-<div align="center" markdown="1">
-   <sup>Special thanks to:</sup>
-   <br>
-   <br>
-   <a href="https://go.warp.dev/MediaCrawler">
-      <img alt="Warp sponsorship" width="400" src="https://github.com/warpdotdev/brand-assets/blob/main/Github/Sponsor/Warp-Github-LG-02.png?raw=true">
-   </a>
+# 🔥 MediaCrawler - Rastreador de Plataformas de Redes Sociales 🕷️
 
-### [Warp is built for coding with multiple AI agents](https://go.warp.dev/MediaCrawler)
+<div align="center">
 
+### 🤝 Agradecimientos Especiales a Nuestro Patrocinador Oro
+
+<a href="https://www.browseract.ai/mediacrawler" target="_blank">
+  <img src="docs/static/images/browseract_ad.jpg" alt="BrowserAct" width="600">
+</a>
+
+<br>
+
+<a href="https://www.browseract.ai/mediacrawler" target="_blank">
+<small>BrowserAct permite extraer datos de cualquier sitio web con una sola frase. Sin código: créalo una vez, reutilízalo de forma estable y consume muy pocos tokens. BrowserAct utiliza un navegador real para crear automáticamente Bots de recolección de datos, con navegación sigilosa, gestión de CAPTCHA y proxies residenciales integrados, y entrega directamente resultados estructurados. Pruébalo gratis ahora.</small>
+</a>
 
 </div>
-<hr>
 
-# 🔥 MediaCrawler - Rastreador de Plataformas de Redes Sociales 🕷️
+---
 
 <div align="center">
 
 <a href="https://trendshift.io/repositories/8291" target="_blank">
   <img src="https://trendshift.io/api/badge/repositories/8291" alt="NanmiCoder%2FMediaCrawler | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
 </a>
+
+[![AtomGit](https://atomgit.com/NanmiCoder/MediaCrawler/star/new_badge.svg)](https://atomgit.com/NanmiCoder/MediaCrawler)
 
 [![GitHub Stars](https://img.shields.io/github/stars/NanmiCoder/MediaCrawler?style=social)](https://github.com/NanmiCoder/MediaCrawler/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/NanmiCoder/MediaCrawler?style=social)](https://github.com/NanmiCoder/MediaCrawler/network/members)
@@ -61,16 +67,14 @@ Una poderosa **herramienta de recolección de datos de redes sociales multiplata
 | Zhihu   | ✅          | ✅              | ✅        | ✅              | ✅          | ✅        | ✅              |
 
 
-<details id="pro-version">
-<summary>🔗 <strong>🚀 ¡Lanzamiento Mayor de MediaCrawlerPro! ¡Más características, mejor diseño arquitectónico!</strong></summary>
-
-### 🚀 ¡Lanzamiento Mayor de MediaCrawlerPro!
+<strong>¡Lanzamiento Mayor de MediaCrawlerPro! ¡El código abierto no es fácil, bienvenido a suscribirse y apoyar!</strong>
 
 > Enfócate en aprender el diseño arquitectónico de proyectos maduros, no solo tecnología de rastreo. ¡La filosofía de diseño de código de la versión Pro también vale la pena estudiar en profundidad!
 
 [MediaCrawlerPro](https://github.com/MediaCrawlerPro) ventajas principales sobre la versión de código abierto:
 
 #### 🎯 Actualizaciones de Características Principales
+- ✅ **Agente de Deconstrucción de Contenido** (Nueva función)
 - ✅ **Funcionalidad de reanudación de rastreo** (Característica clave)
 - ✅ **Soporte de múltiples cuentas + pool de proxy IP** (Característica clave)
 - ✅ **Eliminar dependencia de Playwright**, más fácil de usar
@@ -84,10 +88,9 @@ Una poderosa **herramienta de recolección de datos de redes sociales multiplata
 #### 🎁 Características Adicionales
 - ✅ **Aplicación de escritorio descargadora de videos de redes sociales** (adecuada para aprender desarrollo full-stack)
 - ✅ **Recomendaciones de feed de página de inicio multiplataforma** (HomeFeed)
-- [ ] **Agente AI basado en plataformas de redes sociales está en desarrollo 🚀🚀**
+- [ ] **Agente AI basado en análisis de comentarios está en desarrollo 🚀🚀**
 
 Haga clic para ver: [Página de Inicio del Proyecto MediaCrawlerPro](https://github.com/MediaCrawlerPro) para más información
-</details>
 
 ## 🚀 Inicio Rápido
 
@@ -149,6 +152,61 @@ uv run main.py --platform xhs --lt qrcode --type detail
 uv run main.py --help
 ```
 
+## Soporte WebUI
+
+<details>
+<summary>🖥️ <strong>Interfaz de Operación Visual WebUI</strong></summary>
+
+MediaCrawler proporciona una interfaz de operación visual basada en web, permitiéndole usar fácilmente las funciones del rastreador sin línea de comandos.
+
+#### Desarrollo (recomendado)
+
+Para el desarrollo, debe iniciar tanto el servicio API backend como el servidor de desarrollo Vite frontend:
+
+```shell
+# Terminal 1: iniciar servidor API (puerto predeterminado 8080)
+uv run uvicorn api.main:app --port 8080 --reload
+
+# Terminal 2: iniciar servidor de desarrollo frontend
+cd webui
+npm install
+npm run dev        # se inicia en el puerto 5173 por defecto y redirige /api a 8080
+```
+
+Después de iniciar exitosamente, visite `http://localhost:5173/` para abrir la interfaz WebUI.
+
+> En el primer inicio, se realiza una verificación de entorno (llama a `/api/env/check`), así que asegúrese de que el servicio backend esté en ejecución. Si la verificación falla, puede hacer clic en "Omitir verificación" para omitirla temporalmente.
+
+#### Construir para Producción
+
+Si desea que el servidor API sirva directamente los recursos estáticos de WebUI, construya el frontend primero:
+
+```shell
+cd webui
+npm install
+npm run build      # salida en api/webui/
+```
+
+Luego inicie solo el servidor API:
+
+```shell
+uv run uvicorn api.main:app --port 8080 --reload
+```
+
+Después de iniciar exitosamente, visite `http://localhost:8080` para abrir la interfaz WebUI.
+
+#### Características de WebUI
+
+- Configuración visual de parámetros del rastreador (plataforma, método de login, tipo de rastreo, etc.)
+- Vista en tiempo real del estado de ejecución del rastreador y logs
+- Vista previa y exportación de datos
+
+#### Vista Previa de la Interfaz
+
+<img src="docs/static/images/img_8.png" alt="Vista Previa de Interfaz WebUI">
+
+</details>
+
 <details>
 <summary>🔗 <strong>Usando gestión de entorno venv nativo de Python (No recomendado)</strong></summary>
 
@@ -207,75 +265,82 @@ python main.py --help
 
 ## 💾 Almacenamiento de Datos
 
-Soporta múltiples métodos de almacenamiento de datos:
-- **Archivos CSV**: Soporta guardar en CSV (bajo el directorio `data/`)
-- **Archivos JSON**: Soporta guardar en JSON (bajo el directorio `data/`)
-- **Almacenamiento en Base de Datos**
-  - Use el parámetro `--init_db` para la inicialización de la base de datos (cuando use `--init_db`, no se necesitan otros argumentos opcionales)
-  - **Base de Datos SQLite**: Base de datos ligera, no requiere servidor, adecuada para uso personal (recomendado)
-    1. Inicialización: `--init_db sqlite`
-    2. Almacenamiento de Datos: `--save_data_option sqlite`
-  - **Base de Datos MySQL**: Soporta guardar en la base de datos relacional MySQL (la base de datos debe crearse con anticipación)
-    1. Inicialización: `--init_db mysql`
-    2. Almacenamiento de Datos: `--save_data_option db` (el parámetro db se mantiene por compatibilidad con actualizaciones históricas)
+MediaCrawler soporta múltiples métodos de almacenamiento de datos, incluyendo CSV, JSON, JSONL, Excel, SQLite y bases de datos MySQL.
 
+📖 **Para instrucciones de uso detalladas, por favor vea: [Guía de Almacenamiento de Datos](docs/data_storage_guide.md)**
 
-### Ejemplos de Uso:
-```shell
-# Inicializar la base de datos SQLite (cuando use '--init_db', no se necesitan otros argumentos opcionales)
-uv run main.py --init_db sqlite
-# Usar SQLite para almacenar datos (recomendado para usuarios personales)
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option sqlite
-```
-```shell
-# Inicializar la base de datos MySQL
-uv run main.py --init_db mysql
-# Usar MySQL para almacenar datos (el parámetro db se mantiene por compatibilidad con actualizaciones históricas)
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option db
-```
-
----
 
 [🚀 ¡Lanzamiento Mayor de MediaCrawlerPro 🚀! ¡Más características, mejor diseño arquitectónico!](https://github.com/MediaCrawlerPro)
 
-## 🤝 Comunidad y Soporte
 
 ### 💬 Grupos de Discusión
 - **Grupo de Discusión WeChat**: [Haga clic para unirse](https://nanmicoder.github.io/MediaCrawler/%E5%BE%AE%E4%BF%A1%E4%BA%A4%E6%B5%81%E7%BE%A4.html)
+- **Cuenta de Bilibili**: [Sígueme](https://space.bilibili.com/434377496), compartiendo conocimientos de tecnología de IA y rastreo
 
-### 📚 Documentación y Tutoriales
-- **Documentación en Línea**: [Documentación Completa de MediaCrawler](https://nanmicoder.github.io/MediaCrawler/)
-- **Tutorial de Rastreador**: [Tutorial Gratuito CrawlerTutorial](https://github.com/NanmiCoder/CrawlerTutorial)
-
-
-# Otras preguntas comunes pueden verse en la documentación en línea
->
-> La documentación en línea incluye métodos de uso, preguntas comunes, unirse a grupos de discusión del proyecto, etc.
-> [Documentación en Línea de MediaCrawler](https://nanmicoder.github.io/MediaCrawler/)
->
-
-# Servicios de Conocimiento del Autor
-> Si quiere comenzar rápidamente y aprender el uso de este proyecto, diseño arquitectónico del código fuente, aprender tecnología de programación, o quiere entender el diseño del código fuente de MediaCrawlerPro, puede revisar mi columna de conocimiento pagado.
-
-[Introducción de la Columna de Conocimiento Pagado del Autor](https://nanmicoder.github.io/MediaCrawler/%E7%9F%A5%E8%AF%86%E4%BB%98%E8%B4%B9%E4%BB%8B%E7%BB%8D.html)
-
-
----
-
-## ⭐ Gráfico de Tendencia de Estrellas
-
-¡Si este proyecto te ayuda, por favor da una ⭐ Estrella para apoyar y que más personas vean MediaCrawler!
-
-[![Star History Chart](https://api.star-history.com/svg?repos=NanmiCoder/MediaCrawler&type=Date)](https://star-history.com/#NanmiCoder/MediaCrawler&Date)
 
 ### 💰 Exhibición de Patrocinadores
 
-<a href="https://www.swiftproxy.net/?ref=nanmi">
-<img src="docs/static/images/img_5.png">
-<br>
-**Swiftproxy** - ¡90M+ IPs residenciales puras de alta calidad globales, regístrese para obtener 500MB de tráfico de prueba gratuito, el tráfico dinámico nunca expira!
-> Código de descuento exclusivo: **GHB5** ¡Obtenga 10% de descuento instantáneamente!
-</a>
+<table>
+  <thead>
+    <tr>
+      <th width="220">Patrocinador</th>
+      <th align="left">Introducción</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://tikhub.io/?utm_source=github.com/NanmiCoder/MediaCrawler&utm_medium=marketing_social&utm_campaign=retargeting&utm_content=carousel_ad"><img src="docs/static/images/tikhub_banner_zh.png" width="180" alt="TikHub"></a>
+      </td>
+      <td valign="middle">
+        <a href="https://tikhub.io/?utm_source=github.com/NanmiCoder/MediaCrawler&utm_medium=marketing_social&utm_campaign=retargeting&utm_content=carousel_ad">TikHub.io</a> proporciona 900+ interfaces de datos altamente estables, cubriendo 14+ plataformas principales nacionales e internacionales incluyendo TK, DY, XHS, Y2B, Ins, X, etc. Soporta APIs de datos públicos multidimensionales para usuarios, contenido, productos, comentarios, etc., con 40M+ conjuntos de datos estructurados limpios. Use el código de invitación <code>cfzyejV9</code> para <a href="https://tikhub.io/?utm_source=github.com/NanmiCoder/MediaCrawler&utm_medium=marketing_social&utm_campaign=retargeting&utm_content=carousel_ad">registrarse y recargar</a>, y obtenga $2 adicionales de bonificación.
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://go.nodemaven.com/MediaCrawleroctober"><img src="docs/static/images/nodemaven_banner_oct.png" width="180" alt="NodeMaven"></a>
+      </td>
+      <td valign="middle">
+        <a href="https://go.nodemaven.com/MediaCrawleroctober">NodeMaven</a> es un proveedor eficiente de proxies para web scraping y automatización, con las IP de mayor calidad del mercado. Sus principales ventajas incluyen una disponibilidad del 99,9%, segmentación por código postal, filtrado de IP en todos los proxies (puntuación de fraude inferior al 97%), sin KYC y herramientas gratuitas exclusivas como Proxy Bandwidth Checker, Meta Tag Checker, IP Lookup y más. Los usuarios de MediaCrawler obtienen un 35% de descuento en proxies móviles y residenciales con el código <code>CRAWLER35</code>, y un 40% de descuento en proxies ISP (estáticos) con el código <code>CRAWLER40</code>. 👉 <a href="https://go.nodemaven.com/MediaCrawleroctober">Visita NodeMaven</a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://www.openlux.ai/register?channel=c_drxir46c"><img src="docs/static/images/openlux_logo.png" width="160" alt="OpenLux"></a>
+      </td>
+      <td valign="middle">
+        ¡Gracias a <a href="https://www.openlux.ai/register?channel=c_drxir46c">OpenLux</a> por patrocinar este proyecto! OpenLux es una plataforma de IA todo en uno para empresas que reúne los principales modelos de IA de los grandes proveedores de todo el mundo. Con un servicio rápido y fiable y un soporte técnico ágil, OpenLux ofrece precios base para los modelos de Claude, OpenAI y Gemini desde tan solo el 8,82%, el 4% y el 8% de las tarifas oficiales, respectivamente. Oferta exclusiva para usuarios de MediaCrawler: regístrese a través de nuestro <a href="https://www.openlux.ai/register?channel=c_drxir46c">enlace de referido</a> y disfrute de hasta un 7,5% de descuento en las recargas de crédito. 👉 <a href="https://www.openlux.ai/register?channel=c_drxir46c">Empiece con OpenLux</a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://sx.org/c/CRAWLER3G"><img src="docs/static/images/sx_logo.png" width="180" alt="SX.ORG"></a>
+      </td>
+      <td valign="middle">
+        <a href="https://sx.org/c/CRAWLER3G">SX.ORG</a> es una red de proxies de alto rendimiento diseñada para la extracción intensiva de datos web y la evasión de sistemas antibots, totalmente compatible con MediaCrawler. Sus principales ventajas incluyen cobertura de IP residenciales dinámicas en más de 190 ubicaciones, una disponibilidad de red del 99,9%, segmentación precisa por país, ciudad y ASN, soporte nativo de HTTP(S) y SOCKS5, y rotación flexible de sesiones para plataformas de redes sociales. Los usuarios de MediaCrawler pueden utilizar el código promocional exclusivo <code>CRAWLER3G</code> al registrarse para obtener <strong>3 GB</strong> de tráfico de prueba gratuito. 👉 <a href="https://sx.org/c/CRAWLER3G">Obtenga 3 GB en SX.ORG</a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://proxy-seller.com/?partner=72D769D7B7FB4A8B"><img src="docs/static/images/proxy_seller_logo.png" width="180" alt="Proxy-Seller"></a>
+      </td>
+      <td valign="middle">
+        <a href="https://proxy-seller.com/?partner=72D769D7B7FB4A8B">Proxy-Seller</a> es un proveedor profesional de proxies para web scraping, recopilación de datos y automatización, con cinco líneas de productos —residenciales, móviles (4G/5G/LTE), ISP estáticos y centros de datos IPv4 e IPv6— que cubren más de 220 ubicaciones en todo el mundo, con más de 47 millones de IP residenciales y segmentación precisa por país, ciudad e ISP. Sus principales ventajas incluyen un 99,7% de disponibilidad, compatibilidad total con HTTP(S) y SOCKS5, cambio flexible entre IP estáticas y rotativas, soporte para solicitudes de alta concurrencia, API RESTful y SDK en varios lenguajes (Python, Node.js, PHP, Java, Go), además de soporte técnico 24/7. Cuenta con certificación ISO/IEC 27001 e ISO 9001 y más de 185.000 clientes en todo el mundo, y es adecuado para MediaCrawler y otras herramientas de scraping multiplataforma. Los usuarios de MediaCrawler obtienen un 15% de descuento con el código <code>MCRAWLER15</code>. 👉 <a href="https://proxy-seller.com/?partner=72D769D7B7FB4A8B">Visita Proxy-Seller</a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://dragtokens.com"><img src="docs/static/images/dragtokens_logo.jpg" width="180" alt="DragTokens"></a>
+      </td>
+      <td valign="middle">
+        ¡Gracias a <a href="https://dragtokens.com">DragTokens (Drag API)</a> por patrocinar este proyecto! DragTokens se especializa en ofrecer a los desarrolladores un servicio de retransmisión de API multimodelo, compatible con herramientas de programación con IA como Claude Code, Codex y Gemini CLI, y que cubre modelos principales como GPT, Claude y Gemini. Las tarifas son tan bajas como 1,1× para el grupo dedicado al cliente oficial de Claude (aproximadamente 1,55 de descuento frente a la API oficial, un ahorro del ~84,5%), 0,3× para Codex (aproximadamente 0,42 de descuento, un ahorro del ~96%) y 0,25× para Gemini (aproximadamente 0,35 de descuento, un ahorro del ~96,5%), con un pico de TPM del grupo de cuentas de 700 millones.<br><br>
+        🎁 ¡Los nuevos usuarios que se <a href="https://dragtokens.com">registren mediante este enlace exclusivo</a> reciben un crédito de bienvenida, y una única recarga de 100 CNY también obtiene un 10% de reembolso! La documentación cubre primeros pasos, configuración de herramientas y ejemplos de API, para que tanto la integración como el uso cuenten con una guía. No se almacenan sus prompts ni las respuestas del modelo, y se ofrecen grupos de cuentas dedicados, transferencia corporativa y facturación para equipos empresariales y universitarios.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+---
 
 ### 🤝 Conviértase en Patrocinador
 
@@ -284,10 +349,27 @@ uv run main.py --platform xhs --lt qrcode --type search --save_data_option db
 **Información de Contacto**:
 - WeChat: `relakkes`
 - Email: `relakkes@gmail.com`
+---
+
+### 📚 Otros
+- **Preguntas Frecuentes**: [Documentación Completa de MediaCrawler](https://nanmicoder.github.io/MediaCrawler/)
+
+### 🧩 Mis Otros Proyectos
+- **La Startup que Estoy Creando**: [ModelDial](https://modeldial.com/?utm_source=github&utm_medium=referral&utm_campaign=mediacrawler&utm_content=readme-es) — evalúa modelos de IA con conjuntos de datos privados y compara capacidades, costes y niveles de razonamiento para ayudarte a elegir el modelo adecuado para tus tareas
+- **Agente de Escritorio de Código Abierto**: [cc-haha](https://github.com/NanmiCoder/cc-haha) — espacio de trabajo de escritorio local-first y multiplataforma para agentes, con colaboración multi-agente, Git worktrees, mercado de skills, soporte multimodelo y Computer Use, además de acceso remoto por WeChat / Feishu / DingTalk y más
+- **Plugin para DeepSeek Harness**: [dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) — añade Agent Teams a DeepSeek Harness para que varios agentes colaboren en paralelo en tareas complejas
+
+
+## ⭐ Gráfico de Tendencia de Estrellas
+
+¡Si este proyecto te ayuda, por favor da una ⭐ Estrella para apoyar y que más personas vean MediaCrawler!
+
+[![Star History Chart](https://www.repostars.dev/api/embed?repo=NanmiCoder%2FMediaCrawler&theme=ocean)](https://www.repostars.dev/?repos=NanmiCoder%2FMediaCrawler&theme=ocean)
 
 
 ## 📚 Referencias
 
+- **Repositorio de Firma Xiaohongshu**: [Repositorio de firma xhs de Cloxl](https://github.com/Cloxl/xhshow)
 - **Cliente Xiaohongshu**: [Repositorio xhs de ReaJason](https://github.com/ReaJason/xhs)
 - **Reenvío de SMS**: [Repositorio de referencia SmsForwarder](https://github.com/pppscn/SmsForwarder)
 - **Herramienta de Penetración de Intranet**: [Documentación oficial de ngrok](https://ngrok.com/docs/)

@@ -29,6 +29,7 @@ from playwright.async_api import BrowserContext
 from base.base_crawler import AbstractApiClient
 from proxy.proxy_mixin import ProxyRefreshMixin
 from tools import utils
+from tools.httpx_util import make_async_client
 from var import request_keyword_var
 
 if TYPE_CHECKING:
@@ -38,12 +39,16 @@ from .exception import *
 from .field import *
 from .help import *
 
+# 抖音边缘网关 ArgusSecurityPlugin 要求的请求头。网关目前不校验取值，
+# 传固定字符串即可；将来若开始真校验，会重新出现 "Signature Not Found"。
+DOUYIN_ARGUS_HEADER_VALUE = "1"
+
 
 class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
 
     def __init__(
         self,
-        timeout=60,  # 若开启爬取媒体选项，抖音的短视频需要更久的超时时间
+        timeout=60,  # If the crawl media option is turned on, Douyin’s short videos will require a longer timeout.
         proxy=None,
         *,
         headers: Dict,
@@ -54,10 +59,26 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         self.proxy = proxy
         self.timeout = timeout
         self.headers = headers
+        # 抖音边缘网关的 ArgusSecurityPlugin 会对这批接口做业务前置校验，缺少
+        # x-tt-argus 头时直接 403，响应体为
+        # "Blocked by ArgusSecurityPlugin Uifid Not Found"（补了 uifid 但没这个头则是
+        # "... Signature Not Found"）。当前网关尚未校验该头的值，可传任意字符串；
+        # 一旦升级到真校验，需要改为 WebView 内注入 JS 让页面自带 SDK 补齐。
+        self.headers.setdefault("x-tt-argus", DOUYIN_ARGUS_HEADER_VALUE)
+        uifid = cookie_dict.get("UIFID") or cookie_dict.get("UIFID_TEMP", "")
+        if uifid:
+            self.headers.setdefault("uifid", uifid)
         self._host = "https://www.douyin.com"
+        self.cookie_urls = [
+            "https://douyin.com",
+            self._host,
+            "https://creator.douyin.com",
+            "https://douhot.douyin.com",
+            "https://live.douyin.com",
+        ]
         self.playwright_page = playwright_page
         self.cookie_dict = cookie_dict
-        # 初始化代理池（来自 ProxyRefreshMixin）
+        # Initialize proxy pool (from ProxyRefreshMixin)
         self.init_proxy_pool(proxy_ip_pool)
 
     async def __process_req_params(
@@ -103,7 +124,7 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         params.update(common_params)
         query_string = urllib.parse.urlencode(params)
 
-        # 20240927 a-bogus更新（JS版本）
+        # 20240927 a-bogus update (JS version)
         post_data = {}
         if request_method == "POST":
             post_data = params
@@ -113,10 +134,10 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
             params["a_bogus"] = a_bogus
 
     async def request(self, method, url, **kwargs):
-        # 每次请求前检测代理是否过期
+        # Check whether the proxy has expired before each request
         await self._refresh_proxy_if_expired()
 
-        async with httpx.AsyncClient(proxy=self.proxy) as client:
+        async with make_async_client(proxy=self.proxy) as client:
             response = await client.request(method, url, timeout=self.timeout, **kwargs)
         try:
             if response.text == "" or response.text == "blocked":
@@ -144,11 +165,17 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         if local_storage.get("HasUserLogin", "") == "1":
             return True
 
-        _, cookie_dict = utils.convert_cookies(await browser_context.cookies())
+        _, cookie_dict = await utils.convert_browser_context_cookies(
+            browser_context,
+            urls=self.cookie_urls,
+        )
         return cookie_dict.get("LOGIN_STATUS") == "1"
 
-    async def update_cookies(self, browser_context: BrowserContext):
-        cookie_str, cookie_dict = utils.convert_cookies(await browser_context.cookies())
+    async def update_cookies(self, browser_context: BrowserContext, urls: Optional[list[str]] = None):
+        cookie_str, cookie_dict = await utils.convert_browser_context_cookies(
+            browser_context,
+            urls=urls or self.cookie_urls,
+        )
         self.headers["Cookie"] = cookie_str
         self.cookie_dict = cookie_dict
 
@@ -200,7 +227,19 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         :param aweme_id:
         :return:
         """
-        params = {"aweme_id": aweme_id}
+        # 抖音 detail 接口的 Argus 风控要求这两个参数成套出现，缺一则直接 403
+        # （响应体为 "Blocked by ArgusSecurityPlugin Uifid Not Found"）：
+        #   uifid         = UIFID cookie，没有时退到 UIFID_TEMP
+        #   verifyFp / fp = s_v_web_id cookie
+        # 必须用 cookie 里的 s_v_web_id：实测 uifid 搭配自生成的 verifyFp 会被判成
+        # "Signature Not Found"，两者同源才能通过。
+        s_v_web_id = self.cookie_dict.get("s_v_web_id", "")
+        params = {
+            "aweme_id": aweme_id,
+            "uifid": self.cookie_dict.get("UIFID") or self.cookie_dict.get("UIFID_TEMP", ""),
+            "verifyFp": s_v_web_id,
+            "fp": s_v_web_id,
+        }
         headers = copy.copy(self.headers)
         del headers["Origin"]
         res = await self.get("/aweme/v1/web/aweme/detail/", params, headers)
@@ -266,13 +305,13 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
             if len(result) + len(comments) > max_count:
                 comments = comments[:max_count - len(result)]
             result.extend(comments)
-            if callback:  # 如果有回调函数，就执行回调函数
+            if callback:  # If there is a callback function, execute the callback function
                 await callback(aweme_id, comments)
 
             await asyncio.sleep(crawl_interval)
             if not is_fetch_sub_comments:
                 continue
-            # 获取二级评论
+            # Get secondary reviews
             for comment in comments:
                 reply_comment_total = comment.get("reply_comment_total")
 
@@ -290,7 +329,7 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
                         if not sub_comments:
                             continue
                         result.extend(sub_comments)
-                        if callback:  # 如果有回调函数，就执行回调函数
+                        if callback:  # If there is a callback function, execute the callback function
                             await callback(aweme_id, sub_comments)
                         await asyncio.sleep(crawl_interval)
         return result
@@ -312,8 +351,6 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
             "max_cursor": max_cursor,
             "locate_query": "false",
             "publish_video_strategy_type": 2,
-            'verifyFp': 'verify_ma3hrt8n_q2q2HyYA_uLyO_4N6D_BLvX_E2LgoGmkA1BU',
-            'fp': 'verify_ma3hrt8n_q2q2HyYA_uLyO_4N6D_BLvX_E2LgoGmkA1BU'
         }
         return await self.get(uri, params)
 
@@ -332,20 +369,6 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
             result.extend(aweme_list)
         return result
 
-    async def get_aweme_media(self, url: str) -> Union[bytes, None]:
-        async with httpx.AsyncClient(proxy=self.proxy) as client:
-            try:
-                response = await client.request("GET", url, timeout=self.timeout, follow_redirects=True)
-                response.raise_for_status()
-                if not response.reason_phrase == "OK":
-                    utils.logger.error(f"[DouYinClient.get_aweme_media] request {url} err, res:{response.text}")
-                    return None
-                else:
-                    return response.content
-            except httpx.HTTPError as exc:  # some wrong when call httpx.request method, such as connection error, client error, server error or response status code is not 2xx
-                utils.logger.error(f"[DouYinClient.get_aweme_media] {exc.__class__.__name__} for {exc.request.url} - {exc}")  # 保留原始异常类型名称，以便开发者调试
-                return None
-
     async def resolve_short_url(self, short_url: str) -> str:
         """
         解析抖音短链接,获取重定向后的真实URL
@@ -354,12 +377,12 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         Returns:
             重定向后的完整URL
         """
-        async with httpx.AsyncClient(proxy=self.proxy, follow_redirects=False) as client:
+        async with make_async_client(proxy=self.proxy, follow_redirects=False) as client:
             try:
                 utils.logger.info(f"[DouYinClient.resolve_short_url] Resolving short URL: {short_url}")
                 response = await client.get(short_url, timeout=10)
 
-                # 短链接通常返回302重定向
+                # Short links usually return a 302 redirect
                 if response.status_code in [301, 302, 303, 307, 308]:
                     redirect_url = response.headers.get("Location", "")
                     utils.logger.info(f"[DouYinClient.resolve_short_url] Resolved to: {redirect_url}")
